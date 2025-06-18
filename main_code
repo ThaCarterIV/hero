@@ -27,9 +27,6 @@ from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
 
-import os
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
@@ -71,7 +68,7 @@ def delete_hero(hero_id, heroes):
     save_heroes(heroes)
 
 def call_chat(messages, model=OPENAI_MODEL_TEXT, temperature=0.9, max_tokens=1024):
-    response = openai.chat.completions.create(
+    response = client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=temperature,
@@ -232,6 +229,7 @@ if not st.session_state["OPENAI_API_KEY"]:
     st.stop()
 
 openai.api_key = st.session_state["OPENAI_API_KEY"]
+client = OpenAI(api_key=st.session_state["OPENAI_API_KEY"])
 
 # Session state flags
 if "edit_mode" not in st.session_state:
