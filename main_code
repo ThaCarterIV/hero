@@ -37,8 +37,9 @@ DATA_DIR = Path("comic_data")
 HEROES_FILE = DATA_DIR / "heroes.json"
 IMAGE_DIR = DATA_DIR / "images"
 SUMMARY_DIR = DATA_DIR / "summaries"
+CHAPTER_DIR = DATA_DIR / "chapters"
 
-for d in (DATA_DIR, IMAGE_DIR, SUMMARY_DIR):
+for d in (DATA_DIR, IMAGE_DIR, SUMMARY_DIR, CHAPTER_DIR):
     d.mkdir(exist_ok=True)
 
 OPENAI_MODEL_TEXT = "gpt-4o"      # Text model for stories & hero creation
@@ -136,6 +137,23 @@ def append_summary(hero, summary_text):
     with open(path, "a", encoding="utf-8") as f:
         f.write(summary_text + "\n\n")
 
+def get_chapter_file(hero):
+    """Return path to the chapters file for the hero."""
+    return CHAPTER_DIR / f"{hero['id']}_chapters.txt"
+
+def load_chapters(hero):
+    """Load all chapters concatenated as one string."""
+    path = get_chapter_file(hero)
+    if path.exists():
+        return path.read_text()
+    return ""
+
+def append_chapter(hero, chapter_text):
+    """Append a chapter to the hero's chapters file."""
+    path = get_chapter_file(hero)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(chapter_text + "\n\n")
+
 def generate_story(hero):
     previous_summaries = load_summaries(hero)
     messages = [
@@ -165,6 +183,7 @@ def generate_story(hero):
     ], max_tokens=256)
 
     append_summary(hero, summary)
+    append_chapter(hero, story)
     return story, summary
 
 # -----------------------------------------------------------------------------
@@ -240,6 +259,10 @@ if st.session_state.get("story_mode"):
             st.write(story)
             st.markdown("### Summary")
             st.info(summary)
+
+    if st.button("View Full Story"):
+        st.markdown("### Full Story")
+        st.write(load_chapters(hero))
 
     st.markdown("---")
     st.markdown("### Previous Summaries")
