@@ -210,23 +210,23 @@ cols = st.columns(3)
 for idx, hero in enumerate(heroes):
     with cols[idx % 3]:
         st.image(hero["image_path"], use_container_width=True, caption=hero["name"])
-        if st.button(f"Details_{hero['id']}", key=hero["id"]):
-            st.session_state["active_hero"] = hero
+        if st.button("Details", key=f"details_{hero['id']}"):
+            st.session_state["show_modal"] = hero["id"]
 
-# Hero details view
-if "active_hero" in st.session_state:
-    hero = st.session_state["active_hero"]
-    st.markdown("---")
-    st.header(f"🪪  {hero['name']}")
-    st.image(hero["image_path"], width=256)
-    st.markdown(f"**Hometown:** {hero['hometown']}")
-    st.markdown(f"**Superpowers:** {hero['superpowers']}")
-    st.markdown(f"**Personality:** {hero['personality_traits']}")
-    st.markdown(f"**Backstory:** {hero['backstory']}")
-    st.markdown(f"**Appearance:** {hero['appearance']}")
+    if st.session_state.get("show_modal") == hero["id"]:
+        with st.modal(f"{hero['name']} Details"):
+            st.header(f"🪪  {hero['name']}")
+            st.image(hero["image_path"], width=256)
+            st.markdown(f"**Hometown:** {hero['hometown']}")
+            st.markdown(f"**Superpowers:** {hero['superpowers']}")
+            st.markdown(f"**Personality:** {hero['personality_traits']}")
+            st.markdown(f"**Backstory:** {hero['backstory']}")
+            st.markdown(f"**Appearance:** {hero['appearance']}")
 
-    if st.button("Enter Story Generator"):
-        st.session_state["story_mode"] = True
+            if st.button("Enter Story Generator", key=f"enter_{hero['id']}"):
+                st.session_state["active_hero"] = hero
+                st.session_state["story_mode"] = True
+                st.session_state["show_modal"] = None
 
 # Story generation window
 if st.session_state.get("story_mode"):
