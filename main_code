@@ -234,6 +234,8 @@ client = OpenAI(api_key=st.session_state["OPENAI_API_KEY"])
 # Session state flags
 if "edit_mode" not in st.session_state:
     st.session_state["edit_mode"] = False
+if "show_modal" not in st.session_state:
+    st.session_state["show_modal"] = None
 
 # Load existing heroes
 heroes = load_heroes()
@@ -258,62 +260,26 @@ cols = st.columns(3)
 for idx, hero in enumerate(heroes):
     with cols[idx % 3]:
         st.image(hero["image_path"], use_container_width=True, caption=hero["name"])
-        if st.button(f"Details_{hero['id']}", key=hero["id"]):
-            st.session_state["active_hero"] = hero
+        if st.button("Details", key=f"details_{hero['id']}"):
+            st.session_state["show_modal"] = hero["id"]
 
-# Hero details view
-if "active_hero" in st.session_state:
-    hero = st.session_state["active_hero"]
-    st.markdown("---")
-    st.header(f"🪪  {hero['name']}")
-    st.image(hero["image_path"], width=256)
-    st.markdown(f"**Hometown:** {hero['hometown']}")
-    st.markdown(f"**Superpowers:** {hero['superpowers']}")
-    st.markdown(f"**Personality:** {hero['personality_traits']}")
-    st.markdown(f"**Backstory:** {hero['backstory']}")
-    st.markdown(f"**Appearance:** {hero['appearance']}")
+# Hero details modal
+for hero in heroes:
+    if st.session_state.get("show_modal") == hero["id"]:
+        with st.modal(f"{hero['name']} Details"):
+            st.header(f"🪪  {hero['name']}")
+            st.image(hero["image_path"], width=256)
+            st.markdown(f"**Hometown:** {hero['hometown']}")
+            st.markdown(f"**Superpowers:** {hero['superpowers']}")
+            st.markdown(f"**Personality:** {hero['personality_traits']}")
+            st.markdown(f"**Backstory:** {hero['backstory']}")
+            st.markdown(f"**Appearance:** {hero['appearance']}")
 
-    col_edit, col_delete = st.columns(2)
-    if col_edit.button("Edit Hero"):
-        st.session_state["edit_mode"] = True
-    if col_delete.button("Delete Hero"):
-        delete_hero(hero["id"], heroes)
-        st.session_state.pop("active_hero", None)
-        st.session_state.pop("story_mode", None)
-        st.session_state["edit_mode"] = False
-        st.rerun()
-
-    if st.session_state.get("edit_mode"):
-        name = st.text_input("Name", hero["name"])
-        hometown = st.text_input("Hometown", hero["hometown"])
-        superpowers = st.text_input("Superpowers", hero["superpowers"])
-        personality = st.text_input("Personality", hero["personality_traits"])
-        backstory = st.text_area("Backstory", hero["backstory"])
-        appearance = st.text_input("Appearance", hero["appearance"])
-
-        save_col, cancel_col = st.columns(2)
-        if save_col.button("Save Changes"):
-            updated = {
-                "name": name,
-                "hometown": hometown,
-                "superpowers": superpowers,
-                "personality_traits": personality,
-                "backstory": backstory,
-                "appearance": appearance,
-            }
-            update_hero(hero["id"], updated, heroes)
-            for h in heroes:
-                if h["id"] == hero["id"]:
-                    st.session_state["active_hero"] = h
-                    break
-            st.session_state["edit_mode"] = False
-            st.rerun()
-        if cancel_col.button("Cancel"):
-            st.session_state["edit_mode"] = False
-            st.rerun()
-
-    if st.button("Enter Story Generator"):
-        st.session_state["story_mode"] = True
+            if st.button("Enter Story Generator", key=f"enter_story_{hero['id']}"):
+                st.session_state["active_hero"] = hero
+                st.session_state["story_mode"] = True
+                st.session_state["show_modal"] = None
+                st.rerun()
 
 # Story generation window
 if st.session_state.get("story_mode"):
