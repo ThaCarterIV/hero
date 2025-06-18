@@ -228,6 +228,9 @@ for idx, hero in enumerate(heroes):
                 st.session_state["story_mode"] = True
                 st.session_state["show_modal"] = None
 
+            if st.button("Close", key=f"close_{hero['id']}"):
+                st.session_state["show_modal"] = None
+
 # Story generation window
 if st.session_state.get("story_mode"):
     hero = st.session_state["active_hero"]
