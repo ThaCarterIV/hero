@@ -1,0 +1,246 @@
+"""
+Comic Generator Application
+Author: ChatGPT
+Description:
+A Streamlit-based Python application that lets users create custom superheroes,
+generate comic-style images for them, and write ongoing, AI-driven stories.
+Dependencies:
+    pip install --upgrade streamlit openai pillow requests
+Usage:
+    export OPENAI_API_KEY="your_key"
+    streamlit run comic_generator_app.py
+"""
+
+import os
+import json
+import uuid
+from datetime import datetime
+from pathlib import Path
+from io import BytesIO
+
+import requests
+import streamlit as st
+from PIL import Image
+import openai
+from openai import OpenAI
+
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+DATA_DIR = Path("comic_data")
+HEROES_FILE = DATA_DIR / "heroes.json"
+IMAGE_DIR = DATA_DIR / "images"
+SUMMARY_DIR = DATA_DIR / "summaries"
+
+for d in (DATA_DIR, IMAGE_DIR, SUMMARY_DIR):
+    d.mkdir(exist_ok=True)
+
+OPENAI_MODEL_TEXT = "gpt-4o"      # Text model for stories & hero creation
+OPENAI_MODEL_IMAGE = "dall-e-3"   # Image model for hero portrait
+
+# -----------------------------------------------------------------------------
+# Helper functions
+# -----------------------------------------------------------------------------
+
+def load_heroes():
+    if HEROES_FILE.exists():
+        return json.loads(HEROES_FILE.read_text())
+    return []
+
+def save_heroes(heroes):
+    HEROES_FILE.write_text(json.dumps(heroes, indent=2))
+
+def call_chat(messages, model=OPENAI_MODEL_TEXT, temperature=0.9, max_tokens=1024):
+    response = openai.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    return response.choices[0].message.content.strip()
+
+def create_hero():
+    prompt = (
+        "You are an imaginative comic book writer. "
+        "Create a UNIQUE superhero. Return ONLY valid JSON like:\n"
+        "{\n"
+        '  "name": "",\n'
+        '  "superpowers": "",\n'
+        '  "hometown": "",\n'
+        '  "backstory": "",\n'
+        '  "personality_traits": "",\n'
+        '  "appearance": ""\n'
+        "}"
+    )
+    result = call_chat([{"role": "system", "content": prompt}])
+    try:
+        hero_data = json.loads(result)
+    except json.JSONDecodeError:
+        st.error("Failed to parse hero JSON. Retrying …")
+        return None
+
+    # enrich with IDs & paths
+    hero_data["id"] = str(uuid.uuid4())
+    hero_data["created_at"] = datetime.utcnow().isoformat()
+
+    return hero_data
+
+def generate_hero_image(hero):
+    """Generate a comic-style image for the hero and save it locally."""
+    prompt = (
+        "Generate an image of a comic-style superhero with the following characteristics:\n"
+        f"Name: {hero['name']}\n"
+        f"Superpowers: {hero['superpowers']}\n"
+        f"Appearance: {hero['appearance']}\n"
+        "Style: vibrant modern comic illustration, dynamic pose, clean background"
+    )
+
+    response = client.images.generate(
+    model="dall-e-3",
+    prompt=prompt,
+    size="1024x1024",
+    quality="standard",
+    n=1
+    )
+    img_url = response.data[0].url
+
+    # Download image
+    filename = IMAGE_DIR / f"{hero['id']}.png"
+    try:
+        img_bytes = requests.get(img_url, timeout=30).content
+        Image.open(BytesIO(img_bytes)).save(filename)
+    except Exception as e:
+        st.error(f"Failed to download hero image: {e}")
+        return None
+
+    hero["image_path"] = str(filename)
+    return filename
+
+def get_summary_file(hero):
+    return SUMMARY_DIR / f"{hero['id']}_summaries.txt"
+
+def load_summaries(hero):
+    path = get_summary_file(hero)
+    if path.exists():
+        return path.read_text()
+    return ""
+
+def append_summary(hero, summary_text):
+    path = get_summary_file(hero)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(summary_text + "\n\n")
+
+def generate_story(hero):
+    previous_summaries = load_summaries(hero)
+    messages = [
+        {"role": "system", "content": "You are a master comic author."},
+        {
+            "role": "user",
+            "content": (
+                f"Hero profile:\n"
+                f"Name: {hero['name']}\n"
+                f"Superpowers: {hero['superpowers']}\n"
+                f"Hometown: {hero['hometown']}\n"
+                f"Backstory: {hero['backstory']}\n"
+                f"Personality: {hero['personality_traits']}\n"
+            )
+        },
+        {"role": "user", "content": f"Story so far (summaries):\n{previous_summaries}"},
+        {"role": "user", "content": "Write the next chapter with deep, complex narrative, mature witty dialogue, dynamic character development, and epic moments."}
+    ]
+    story = call_chat(messages, max_tokens=2048)
+
+    summary_prompt = (
+        "Summarise the following comic chapter in 3-5 sentences, hitting main plot points and character development:"
+    )
+    summary = call_chat([
+        {"role": "system", "content": summary_prompt},
+        {"role": "user", "content": story},
+    ], max_tokens=256)
+
+    append_summary(hero, summary)
+    return story, summary
+
+# -----------------------------------------------------------------------------
+# Streamlit UI
+# -----------------------------------------------------------------------------
+
+st.set_page_config(page_title="Comic Generator HQ", layout="wide")
+st.title("🏙️  Superhero Headquarters")
+
+# API KEY Handling
+if "OPENAI_API_KEY" not in st.session_state:
+    st.session_state["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
+if not st.session_state["OPENAI_API_KEY"]:
+    st.info("Enter your OpenAI API key to begin.")
+    key_input = st.text_input("OpenAI API Key", type="password")
+    if st.button("Save Key") and key_input:
+        st.session_state["OPENAI_API_KEY"] = key_input
+        st.success("API key saved! 🎉")
+    st.stop()
+
+openai.api_key = st.session_state["OPENAI_API_KEY"]
+
+# Load existing heroes
+heroes = load_heroes()
+
+# Sidebar – create new hero
+st.sidebar.header("🦸‍♂️ Create A New Hero")
+if st.sidebar.button("Create Hero"):
+    with st.spinner("Assembling hero…"):
+        hero = create_hero()
+        if hero:
+            generate_hero_image(hero)
+            heroes.append(hero)
+            save_heroes(heroes)
+            # Use st.rerun() if available, else fallback
+            if hasattr(st, "rerun"):
+                st.rerun()
+            else:
+                st.rerun()
+
+# Display hero cards
+cols = st.columns(3)
+for idx, hero in enumerate(heroes):
+    with cols[idx % 3]:
+        st.image(hero["image_path"], use_container_width=True, caption=hero["name"])
+        if st.button(f"Details_{hero['id']}", key=hero["id"]):
+            st.session_state["active_hero"] = hero
+
+# Hero details view
+if "active_hero" in st.session_state:
+    hero = st.session_state["active_hero"]
+    st.markdown("---")
+    st.header(f"🪪  {hero['name']}")
+    st.image(hero["image_path"], width=256)
+    st.markdown(f"**Hometown:** {hero['hometown']}")
+    st.markdown(f"**Superpowers:** {hero['superpowers']}")
+    st.markdown(f"**Personality:** {hero['personality_traits']}")
+    st.markdown(f"**Backstory:** {hero['backstory']}")
+    st.markdown(f"**Appearance:** {hero['appearance']}")
+
+    if st.button("Enter Story Generator"):
+        st.session_state["story_mode"] = True
+
+# Story generation window
+if st.session_state.get("story_mode"):
+    hero = st.session_state["active_hero"]
+    st.markdown("## ✍️  Story Generator")
+    if st.button("Generate Next Chapter"):
+        with st.spinner("Weaving epic tale…"):
+            story, summary = generate_story(hero)
+            st.success("Chapter complete!")
+            st.markdown("### Story")
+            st.write(story)
+            st.markdown("### Summary")
+            st.info(summary)
+
+    st.markdown("---")
+    st.markdown("### Previous Summaries")
+    st.write(load_summaries(hero))
