@@ -57,6 +57,19 @@ def load_heroes():
 def save_heroes(heroes):
     HEROES_FILE.write_text(json.dumps(heroes, indent=2))
 
+def update_hero(hero_id, updated_fields, heroes):
+    """Update a hero entry and persist the change."""
+    for idx, h in enumerate(heroes):
+        if h["id"] == hero_id:
+            heroes[idx].update(updated_fields)
+            break
+    save_heroes(heroes)
+
+def delete_hero(hero_id, heroes):
+    """Remove a hero from the list and persist the change."""
+    heroes[:] = [h for h in heroes if h["id"] != hero_id]
+    save_heroes(heroes)
+
 def call_chat(messages, model=OPENAI_MODEL_TEXT, temperature=0.9, max_tokens=1024):
     response = openai.chat.completions.create(
         model=model,
@@ -220,6 +233,10 @@ if not st.session_state["OPENAI_API_KEY"]:
 
 openai.api_key = st.session_state["OPENAI_API_KEY"]
 
+# Session state flags
+if "edit_mode" not in st.session_state:
+    st.session_state["edit_mode"] = False
+
 # Load existing heroes
 heroes = load_heroes()
 
@@ -257,6 +274,45 @@ if "active_hero" in st.session_state:
     st.markdown(f"**Personality:** {hero['personality_traits']}")
     st.markdown(f"**Backstory:** {hero['backstory']}")
     st.markdown(f"**Appearance:** {hero['appearance']}")
+
+    col_edit, col_delete = st.columns(2)
+    if col_edit.button("Edit Hero"):
+        st.session_state["edit_mode"] = True
+    if col_delete.button("Delete Hero"):
+        delete_hero(hero["id"], heroes)
+        st.session_state.pop("active_hero", None)
+        st.session_state.pop("story_mode", None)
+        st.session_state["edit_mode"] = False
+        st.rerun()
+
+    if st.session_state.get("edit_mode"):
+        name = st.text_input("Name", hero["name"])
+        hometown = st.text_input("Hometown", hero["hometown"])
+        superpowers = st.text_input("Superpowers", hero["superpowers"])
+        personality = st.text_input("Personality", hero["personality_traits"])
+        backstory = st.text_area("Backstory", hero["backstory"])
+        appearance = st.text_input("Appearance", hero["appearance"])
+
+        save_col, cancel_col = st.columns(2)
+        if save_col.button("Save Changes"):
+            updated = {
+                "name": name,
+                "hometown": hometown,
+                "superpowers": superpowers,
+                "personality_traits": personality,
+                "backstory": backstory,
+                "appearance": appearance,
+            }
+            update_hero(hero["id"], updated, heroes)
+            for h in heroes:
+                if h["id"] == hero["id"]:
+                    st.session_state["active_hero"] = h
+                    break
+            st.session_state["edit_mode"] = False
+            st.rerun()
+        if cancel_col.button("Cancel"):
+            st.session_state["edit_mode"] = False
+            st.rerun()
 
     if st.button("Enter Story Generator"):
         st.session_state["story_mode"] = True
