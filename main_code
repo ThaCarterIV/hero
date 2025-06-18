@@ -132,10 +132,24 @@ def load_summaries(hero):
         return path.read_text()
     return ""
 
+def load_summary_entries(hero):
+    """Return a list of existing summary entries for the hero."""
+    text = load_summaries(hero).strip()
+    if not text:
+        return []
+    return [entry.strip() for entry in text.split("\n\n") if entry.strip()]
+
+def count_summaries(hero):
+    """Return the number of saved summaries for the hero."""
+    return len(load_summary_entries(hero))
+
 def append_summary(hero, summary_text):
     path = get_summary_file(hero)
+    chapter_num = count_summaries(hero) + 1
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    entry = f"Chapter {chapter_num} ({timestamp})\n{summary_text}\n\n"
     with open(path, "a", encoding="utf-8") as f:
-        f.write(summary_text + "\n\n")
+        f.write(entry)
 
 def get_chapter_file(hero):
     """Return path to the chapters file for the hero."""
@@ -266,4 +280,6 @@ if st.session_state.get("story_mode"):
 
     st.markdown("---")
     st.markdown("### Previous Summaries")
-    st.write(load_summaries(hero))
+    for entry in load_summary_entries(hero):
+        st.markdown(entry)
+        st.markdown("---")
