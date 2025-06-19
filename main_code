@@ -285,7 +285,10 @@ for idx, hero in enumerate(heroes):
             f"</div>",
             unsafe_allow_html=True,
         )
-        if st.button(" ", key=f"card_{hero['id']}", label_visibility="hidden", use_container_width=True):
+        # `st.button` does not support a ``label_visibility`` parameter. Passing
+        # it results in a ``TypeError`` on some Streamlit versions. We simply
+        # use a space as the label to keep the layout the same.
+        if st.button(" ", key=f"card_{hero['id']}", use_container_width=True):
             st.session_state["show_modal"] = hero["id"]
 
 # Hero details modal
