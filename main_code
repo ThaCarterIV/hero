@@ -256,11 +256,36 @@ if st.sidebar.button("Create Hero"):
                 st.rerun()
 
 # Display hero cards
+card_css = """
+<style>
+.hero-card {
+    border: 1px solid #DDD;
+    border-radius: 6px;
+    overflow: hidden;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+.hero-card-name {
+    padding: 0.5rem;
+    font-weight: bold;
+    border-top: 1px solid #EEE;
+    background-color: #f9f9f9;
+}
+</style>
+"""
+st.markdown(card_css, unsafe_allow_html=True)
+
 cols = st.columns(3)
 for idx, hero in enumerate(heroes):
     with cols[idx % 3]:
-        st.image(hero["image_path"], use_container_width=True, caption=hero["name"])
-        if st.button("Details", key=f"details_{hero['id']}"):
+        st.markdown(
+            f"<div class='hero-card'>"
+            f"<img src='{hero['image_path']}' style='width:100%;'>"
+            f"<div class='hero-card-name'>{hero['name']}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button(" ", key=f"card_{hero['id']}", label_visibility="hidden", use_container_width=True):
             st.session_state["show_modal"] = hero["id"]
 
 # Hero details modal
