@@ -266,8 +266,20 @@ for idx, hero in enumerate(heroes):
 # Hero details modal
 for hero in heroes:
     if st.session_state.get("show_modal") == hero["id"]:
-        with st.modal(f"{hero['name']} Details"):
-            st.header(f"🪪  {hero['name']}")
+        # Streamlit versions prior to 1.25 do not provide `st.modal`, so fall
+        # back to a normal container in that case.
+        if hasattr(st, "modal"):
+            ctx = st.modal(f"{hero['name']} Details")
+            heading = None
+        else:
+            ctx = st.container()
+            heading = f"### {hero['name']} Details"
+
+        with ctx:
+            if heading:
+                st.markdown(heading)
+            else:
+                st.header(f"🪪  {hero['name']}")
             st.image(hero["image_path"], width=256)
             st.markdown(f"**Hometown:** {hero['hometown']}")
             st.markdown(f"**Superpowers:** {hero['superpowers']}")
